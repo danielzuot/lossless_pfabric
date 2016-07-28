@@ -9,10 +9,12 @@ import json
 trace_data = np.loadtxt(params.trace, delimiter=params.trace_delim)
 
 
-################### plot queue length over time ##################
+# ################### plot queue length over time ##################
 fig = plt.figure()
 byte_size_offset = 1
 plt.plot(trace_data[:,0], trace_data[:,byte_size_offset])
+for thresh in params.byte_thresholds:
+    plt.axhline(y=thresh)
 # axes = plt.gca()
 # axes.set_xlim([0.4, 0.8])
 # axes.set_ylim([0,100])
@@ -23,34 +25,37 @@ plt.show()
 
 
 ################### stackplot of queue makeup over time ##################
-fig, axarr = plt.subplots(2, sharex=True)
-makeup_offset = 2
-for thresh in params.byte_thresholds:
-    axarr[0].axhline(y=thresh)
-axarr[0].stackplot(np.transpose(trace_data[:,0]), np.transpose(trace_data[:,makeup_offset:makeup_offset+len(params.priorities)]))
+# fig, axarr = plt.subplots(2, sharex=True)
+# makeup_offset = 2
+# for thresh in params.byte_thresholds:
+#     axarr[0].axhline(y=thresh)
+# axarr[0].stackplot(np.transpose(trace_data[:,0]), np.transpose(trace_data[:,makeup_offset:makeup_offset+len(params.priorities)]), labels=params.priorities)
 
-axarr[0].set_title('Makeup of queue')
-axarr[0].set_ylabel('size (bytes)')
+# # Put a legend to the right of the current axis
+# axarr[0].legend(loc='center left', bbox_to_anchor=(1, 0.5))
+# axarr[1].set_xlim([0,params.sim_duration])
+# axarr[0].set_title('Makeup of queue')
+# axarr[0].set_ylabel('size (bytes)')
 
 
 ################### plot pause thresholds over time ##################
-pauses_offset = 2 + len(params.priorities)
-axarr[1].plot(trace_data[:,0], trace_data[:,pauses_offset])
-axarr[1].set_ylim([-2,params.priorities[-1]+1])
-axarr[1].set_title('Pauses sent')
-axarr[1].set_xlabel('time (s)')
-axarr[1].set_ylabel('Pause threshold')
-plt.show()
+# pauses_offset = 2 + len(params.priorities)
+# axarr[1].plot(trace_data[:,0], trace_data[:,pauses_offset])
+# axarr[1].set_ylim([-2,params.priorities[-1]+1])
+# axarr[1].set_title('Pauses sent')
+# axarr[1].set_xlabel('time (s)')
+# axarr[1].set_ylabel('Pause threshold')
+# plt.show()
 
 ################### plot drops over time ##################
-fig = plt.figure()
-drops_offset = 3 + len(params.priorities)
-plt.plot(trace_data[:,0], trace_data[:,drops_offset])
-# axes = plt.gca()
-# axes.set_xlim([0.4, 0.8])
-# axes.set_ylim([0,100])
-plt.title('Drops')
-plt.xlabel('time (s)')
-plt.ylabel('Drops (packets)')
-plt.show()
+# fig = plt.figure()
+# drops_offset = 3 + len(params.priorities)
+# plt.plot(trace_data[:,0], trace_data[:,drops_offset])
+# # axes = plt.gca()
+# # axes.set_xlim([0.4, 0.8])
+# # axes.set_ylim([0,100])
+# plt.title('Drops')
+# plt.xlabel('time (s)')
+# plt.ylabel('Drops (packets)')
+# plt.show()
 

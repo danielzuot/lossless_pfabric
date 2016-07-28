@@ -52,8 +52,10 @@ class PacketGenerator(object):
         ----------
         env : simpy.Environment
             the simulation environment
-        adist : function
-            a no parameter function that returns the successive inter-arrival times of the packets
+        inter_burst_dist : function
+            a no parameter function that returns the successive inter-arrival times of the bursts
+        intra_burst_dist : function
+            a no parameter function that returns the successive inter-arrival times of the packets within the bursts
         sdist : function
             a no parameter function that returns the successive sizes of the packets
         initial_delay : number
@@ -63,15 +65,17 @@ class PacketGenerator(object):
 
 
     """
-    def __init__(self, env, id,  adist, sdist, initial_delay=0, finish=float("inf"), flow_id=0, priority=0):
+    def __init__(self, env, id,  burst_size, burst_dist, sdist, initial_delay=0, finish=float("inf"), flow_id=0, priority=0):
         self.id = id
         self.env = env
-        self.adist = adist
+        self.burst_size = burst_size
+        self.burst_dist = burst_dist
         self.sdist = sdist
         self.initial_delay = initial_delay
         self.finish = finish
         self.out = None
         self.packets_sent = 0
+        self.bursts = 0
         self.action = env.process(self.run())  # starts the run() method as a SimPy process
         self.flow_id = flow_id
         self.priority = priority
@@ -82,10 +86,12 @@ class PacketGenerator(object):
         yield self.env.timeout(self.initial_delay)
         while self.env.now < self.finish:
             # wait for next transmission
-            yield self.env.timeout(self.adist())
-            self.packets_sent += 1
-            p = Packet(self.env.now, self.sdist(), self.packets_sent, src=self.id, flow_id=self.flow_id, priority=self.priority)
-            self.out.put(p)
+            yield self.env.timeout(self.burst_dist())
+            self.bursts += 1
+            for i in range(self.burst_size):
+                self.packets_sent += 1
+                p = Packet(self.env.now, self.sdist(), self.packets_sent, src=self.id, flow_id=self.flow_id, priority=self.priority)
+                self.out.put(p)
 
 class PacketSink(object):
     """ Receives packets and collects delay information into the
@@ -250,6 +256,8 @@ class PrioritySwitchPort(object):
         self.out.put(pkt)
 
     def put(self, pkt):
+        if self.debug:
+            print "{}: {}".format(self.env.now, pkt)
         self.packets_rec += 1
         self.byte_size += pkt.size
         bisect.insort_left(self.queue, pkt)
@@ -290,7 +298,7 @@ class PrioritySwitchPort(object):
                             # to determine the pause value, we need to determine what the highest remaining priority will be 
                             # when we eventually resume this pause
                             # so we check the value of the packet in the queue 'at' the resume threshold (with small technicalities)
-                        resume_threshold = prev_cp.thresh
+                        resume_threshold = prev_cp.thresh - params.B * params.packet_size
                         queue_size = 0
                         hrp = -1
                         for i in range(len(self.queue)):

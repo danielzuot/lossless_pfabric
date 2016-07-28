@@ -7,16 +7,12 @@ from model import PacketGenerator, PacketSink, PrioritySwitchPort, Checkpoint, C
 env = simpy.Environment()  # Create the SimPy environment
 # Create the packet generators and sink
 ps = PacketSink(env, debug=False)  # debugging enable for simple output
-
-pg0 = PacketGenerator(env, "A", lambda: expovariate(params.generate_rate), lambda: params.packet_size, flow_id=0, priority=0)
-pg1 = PacketGenerator(env, "B", lambda: expovariate(params.generate_rate), lambda: params.packet_size, flow_id=1, priority=1)
-pg2 = PacketGenerator(env, "C", lambda: expovariate(params.generate_rate), lambda: params.packet_size, flow_id=2, priority=2)
-pg3 = PacketGenerator(env, "D", lambda: expovariate(params.generate_rate), lambda: params.packet_size, flow_id=3, priority=3)
-pg4 = PacketGenerator(env, "E", lambda: expovariate(params.generate_rate), lambda: params.packet_size, flow_id=4, priority=4)
-
+pgs = []
+for priority in params.priorities:
+    pgs.append(PacketGenerator(env, priority, params.burst_size, lambda: expovariate(1.0/params.burst_interval), lambda: params.packet_size, flow_id=priority, priority=priority))
 
 switch1 = PrioritySwitchPort(env, rate=params.input_rate, qlimit=None, pause=False, debug=False)
-switch2 = PrioritySwitchPort(env, rate=params.output_rate, qlimit=params.qlimit, pause=True, debug=False)
+switch2 = PrioritySwitchPort(env, rate=params.output_rate, qlimit=params.qlimit * params.packet_size, pause=True, debug=False)
 
 checkpoints = []
 checkpoints.append(Checkpoint(-1, CheckpointAction.NONE))
@@ -37,18 +33,15 @@ switch2.back = switch1
 pm2 = PortMonitor(env, switch2, lambda: params.trace_rate, params.trace)
 
 # Wire packet generators and sink together
-pg0.out = switch1
-pg1.out = switch1
-pg2.out = switch1
-pg3.out = switch1
-pg4.out = switch1
+for pg in pgs:
+    pg.out = switch1
 switch1.out = switch2
 switch2.out = ps
 
 
 ## Simulate  ----------------------------------
 seed(params.seed)
-while env.peek() < 500:
+while env.peek() < params.sim_duration:
     # print env.peek()
     env.step()
 
