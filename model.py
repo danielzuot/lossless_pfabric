@@ -260,10 +260,12 @@ class PrioritySwitchPort(object):
             print "{}: {}".format(self.env.now, pkt)
         self.packets_rec += 1
         self.byte_size += pkt.size
+        if self.queue:
+            if pkt.priority > self.queue[-1].priority:
+                self.unpause_check.succeed()
+                self.unpause_check = self.env.event()
         bisect.insort_left(self.queue, pkt)
         self.store.put(pkt)
-        self.unpause_check.succeed()
-        self.unpause_check = self.env.event()
 
         if self.qlimit is None:
             return
@@ -342,37 +344,43 @@ class PortMonitor(object):
             the file where the trace will be recorded
 
     """
-    def __init__(self, env, port, dist, trace):
+    def __init__(self, env, port, dist, trace, debug):
         self.port = port
         self.env = env
         self.dist = dist
         self.trace = trace
+        self.debug = debug
+        self.queue_sizes = []
         self.action = env.process(self.run())
 
     def run(self):
-        with open(self.trace, 'w') as tr:
-            # tr.write("time byte_size queue pause_sent pause_rec prev_cp next_cp drops\n")
+        if self.debug:
+            with open(self.trace, 'w') as tr:
+                while True:
+                    yield self.env.timeout(self.dist())
+                    q_makeup = []
+                    for priority in params.priorities:
+                        subqueue = [pkt.size if (pkt.priority == priority) else 0 for pkt in self.port.queue]
+                        q_makeup.append(sum(subqueue))
+
+                    tr.write(str(self.env.now))
+                    tr.write(params.trace_delim)
+                    tr.write(str(self.port.byte_size))
+                    tr.write(params.trace_delim)
+                    for i in range(len(params.priorities)):
+                        tr.write(str(q_makeup[i]))
+                        tr.write(params.trace_delim)
+                    if self.port.pause_sent:
+                        tr.write(str(self.port.pause_sent[-1]))
+                    else:
+                        tr.write(str(-1))
+                    tr.write(params.trace_delim)
+                    tr.write(str(self.port.packets_drop))
+                    tr.write("\n")
+
+        else:
             while True:
                 yield self.env.timeout(self.dist())
-                q_makeup = []
-                for priority in params.priorities:
-                    subqueue = [pkt.size if (pkt.priority == priority) else 0 for pkt in self.port.queue]
-                    q_makeup.append(sum(subqueue))
-
-                tr.write(str(self.env.now))
-                tr.write(params.trace_delim)
-                tr.write(str(self.port.byte_size))
-                tr.write(params.trace_delim)
-                for i in range(len(params.priorities)):
-                    tr.write(str(q_makeup[i]))
-                    tr.write(params.trace_delim)
-                if self.port.pause_sent:
-                    tr.write(str(self.port.pause_sent[-1]))
-                else:
-                    tr.write(str(-1))
-                tr.write(params.trace_delim)
-                tr.write(str(self.port.packets_drop))
-                tr.write("\n")
-
+                self.queue_sizes.append(self.port.byte_size)
             
             
